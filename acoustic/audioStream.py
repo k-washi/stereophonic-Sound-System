@@ -9,12 +9,12 @@ from utils.config import configInit
 Conf = configInit()
 logger = Conf.setLogger(__name__)
 
-from acoustic.acousticSignalProc import AudioDevice,SpectrogramProcessing, convNp2pa, convPa2np
+from acoustic.acousticSignalProc import AudioDevice, SpectrogramProcessing, WaveProcessing, convNp2pa, convPa2np
 
 # ------------
 
 import pyaudio
-import keyboard
+
 import scipy
 import numpy as np
 import time
@@ -24,32 +24,58 @@ class MicAudioStream():
     self.pAudio = pyaudio.PyAudio()
     self.micInfo = AudioDevice(Conf.MicID)
     self.outInfo = AudioDevice(Conf.OutpuID)
-    self.format = pyaudio.paFloat32
+
+    self.startTime = time.time()
+
+    if Conf.SysSampleWidth == 2:
+      self.format = pyaudio.paInt16
+      self.dtype = np.int16
+    elif Conf.SysSampleWidth == 4:
+      self.format = pyaudio.paInt32
+      self.dtype = np.int32
+      logger.critical("現在対応していない")
+      exec(-1)
 
     self.fft = SpectrogramProcessing()
     
-    self.data = np.zeros((Conf.SysChunk), dtype=np.float32)
-    self.npData = np.zeros((self.outInfo.micOutChannelNum, Conf.SysChunk) , dtype=np.float32)
-    self.freqData = np.zeros((self.outInfo.micOutChannelNum, self.fft.freq.shape[0]), dtype=np.float32)
-    self.outData = np.zeros((self.outInfo.micOutChannelNum * Conf.SysChunk), dtype=np.float32)
-    print(self.data.shape, self.npData.shape, self.outData.shape)
+    self.data = np.zeros((int(Conf.SysChunk * 2)), dtype=self.dtype)
+    self.npData = np.zeros((self.outInfo.micOutChannelNum, int(Conf.SysChunk * 2)) , dtype=self.dtype)
+    self.freqData = np.zeros((int(Conf.SysChunk/Conf.SysFFToverlap), self.outInfo.micOutChannelNum, self.fft.freq.shape[0]), dtype=np.complex)
+    self.convFreqData = np.zeros((self.outInfo.micOutChannelNum, int(Conf.SysChunk*2)) , dtype=self.dtype)
+    self.outData = np.zeros((self.outInfo.micOutChannelNum * Conf.SysChunk), dtype=self.dtype)
+
+    self.overlapNum = int(Conf.SysChunk / Conf.SysFFToverlap) 
+
+    if Conf.Record:
+      #test/listOrNumpy.py - concatenateは、numpyをlistに変換して挿入したほうが早い
+      self.recordList = []
+
   def callback(self, in_data, frame_count, time_info, status):
-    try:
+    if time.time() - self.startTime > Conf.SysCutTime:
       #pyAudio 2 numpy
-      self.npData[:] = convPa2np(scipy.fromstring(in_data, scipy.float32), channelNum=self.micInfo.micChannelNum)[0, :] #ch1 input
-      self.freqData[:,:] = self.fft.fft(self.npData)
-      #self.npData[:,:] = self.data[:] #各チャネルに同じ値をins
-      
-      self.fft.ifft(self.freqData)
 
-      self.outData[:] = convNp2pa(self.npData)
+      self.npData[:,Conf.SysChunk:] = convPa2np(np.fromstring(in_data, self.dtype), channelNum=self.micInfo.micChannelNum)[0, :] #ch1 input
       
-      #numpy 2 pyAudio
-      out_data = self.outData.astype(np.float32).tostring()
-      
-    except KeyboardInterrupt:
-      pass
+      for i in range(self.overlapNum): #2, 4, 8
+        self.freqData[i, :, :] = self.fft.fft(self.npData[:, Conf.SysFFToverlap * i : Conf.SysChunk + Conf.SysFFToverlap * i])
+        
+        
+      #doSomething
 
+      for i in range(self.overlapNum):
+        self.convFreqData[:, Conf.SysFFToverlap * i : Conf.SysChunk + Conf.SysFFToverlap * i] += self.fft.ifft(self.freqData[i]).astype(self.dtype)
+
+      self.outData[:] = convNp2pa(self.convFreqData[:,:Conf.SysChunk]) / self.overlapNum
+      if Conf.Record:
+        self.recordList += self.outData.tolist()
+      
+
+      self.npData[:, :Conf.SysChunk] = self.npData[:, Conf.SysChunk:]
+      self.convFreqData[:, :Conf.SysChunk] = self.convFreqData[:, Conf.SysChunk:]
+      self.convFreqData[:,Conf.SysChunk:] = 0
+      
+    #numpy 2 pyAudio
+    out_data = self.outData.tostring()
     
     return (out_data, pyaudio.paContinue)
   
@@ -93,18 +119,30 @@ class MicAudioStream():
     self.stream.start_stream()
 
   def stop(self):
+    
     while self.stream.is_active():
-      time.sleep(0.1)
+      if Conf.Record:
+        if  time.time() - self.startTime > Conf.RecordTime + Conf.SysCutTime:
+          break
       #logger.debug("active")
   
+
+
+    if Conf.Record:
+      record = WaveProcessing()
+      record.SaveFlatteData(self.recordList, channelNum=self.outInfo.micOutChannelNum)
+
+
     self.stream.start_stream()
     self.stream.close()
     self.close()
+    
 
   
   def close(self):
     self.pAudio.terminate()
     logger.debug("Close proc")
+    exit(0)
 
 if __name__ == "__main__":
   st = MicAudioStream()

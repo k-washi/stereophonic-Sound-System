@@ -93,6 +93,7 @@ class WaveProcessing():
   def Save(self):
     logger.info("Start save as {0}".format(Conf.WavefileSavePath))
     saveData = convNp2pa(self.data)
+    print(saveData)
     saveData = struct.pack('h' * len(saveData), *saveData)
 
     with wave.open(Conf.WavefileSavePath, 'w') as ww:
@@ -102,12 +103,28 @@ class WaveProcessing():
       ww.writeframes(saveData)
       logger.info("End Save as {0}".format(Conf.WavefileSavePath)) 
   
-  def getData(self, data, samplingRate = None):
+  def SaveFlatteData(self, data, channelNum, samplingRate = Conf.SamplingRate, width = Conf.SysSampleWidth):
+    logger.info("Start save as {0}".format(Conf.WavefileSavePath))
+    
+    data = struct.pack('h' * len(data), *data)
+
+    with wave.open(Conf.WavefileSavePath, 'wb') as ww:
+      ww.setnchannels(channelNum)
+      ww.setsampwidth(width)
+      ww.setframerate(samplingRate)
+      ww.writeframes(data)
+      logger.info("End Save as {0}".format(Conf.WavefileSavePath)) 
+
+
+  def getData(self, data, samplingRate = None, Width = None):
     #channel num x frame num
     self.data = data
     self.wavChannelNum, self.wavFrameNum = self.data.shape
     if samplingRate is not None:
       self.wavSamplingRate = samplingRate
+    if Width is not None:
+      self.wavWidth = Width
+    
 
 
 # -------- Utils -----------------
@@ -143,15 +160,15 @@ class SpectrogramProcessing():
   def fft(self, data):
     #in data: chanel_num x frame num(Conf.SysChunk)
     #out: chanel_num x freq num (if 1.6kHz, 0,...,7984.375 Hz) 
-    data = np.fft.rfft(data * self.window)
    
-    return data
+   
+    return np.fft.rfft(data * self.window)
 
   def ifft(self, data):
     #in: chanel_num x freq num (if 1.6kHz, 0,...,7984.375 Hz) 
     #out: chanel_num x frame num(Conf.SysChunk)
-    data = np.fft.irfft(data)
-    return data
+   
+    return np.fft.irfft(data)
 
 
 if __name__ == '__main__':

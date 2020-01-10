@@ -33,12 +33,15 @@ class configInit():
 
       self.OutpuID = int(config_ini['Output']['ID'])
       self.Record = bool(int(config_ini['Output']['Record']))
+      self.RecordTime = float(config_ini['Output']['RecordTime'])
 
       self.WavefilePath = config_ini['Wavefile']['Path']
       self.WavefileSavePath = config_ini['Wavefile']['SavePath']
 
       self.SysChunk = int(config_ini['System']['Chunk'])
-
+      self.SysFFToverlap = int(config_ini['System']['FFToverlap'])
+      self.SysSampleWidth = int(config_ini['System']['SampleWidth'])
+      self.SysCutTime = float(config_ini['System']['CutTime'])
 
     except Exception as e:
       logger.info(e)
