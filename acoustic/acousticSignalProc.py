@@ -14,7 +14,9 @@ logger = Conf.setLogger(__name__)
 import pyaudio
 import wave
 import scipy
+import numpy as np
 import struct
+
 
 
 class AudioDevice():
@@ -42,6 +44,10 @@ class AudioDevice():
         self.micSamplingRate = int(micInfoDic['defaultSampleRate'])
         text = 'Set Audio Device Info || Index: {0} | Name: {1} | ChannelNum: {2}, {3} | SampleRate: {4}'.format(micId, self.micName, self.micChannelNum,self.micOutChannelNum, self.micSamplingRate)
         logger.info(text)
+
+        if self.micChannelNum > 2:
+          logger.critical("3個以上のマイクロホン入力に対応していません。")
+          exit(-1)
 
         break
 
@@ -127,6 +133,25 @@ def convNp2pa(data):
   array([0, 1, 2, 3, 4, 5])
   """
   return data.T.reshape([-1]) 
+
+
+class SpectrogramProcessing():
+  def __init__(self, freq = Conf.SamplingRate):
+    self.window = np.hamming(Conf.SysChunk)
+    self.freq = np.fft.rfftfreq(Conf.SysChunk, d=1./freq)
+   
+  def fft(self, data):
+    #in data: chanel_num x frame num(Conf.SysChunk)
+    #out: chanel_num x freq num (if 1.6kHz, 0,...,7984.375 Hz) 
+    data = np.fft.rfft(data * self.window)
+   
+    return data
+
+  def ifft(self, data):
+    #in: chanel_num x freq num (if 1.6kHz, 0,...,7984.375 Hz) 
+    #out: chanel_num x frame num(Conf.SysChunk)
+    data = np.fft.irfft(data)
+    return data
 
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@ from utils.config import configInit
 Conf = configInit()
 logger = Conf.setLogger(__name__)
 
-from acoustic.acousticSignalProc import AudioDevice, convNp2pa, convPa2np
+from acoustic.acousticSignalProc import AudioDevice,SpectrogramProcessing, convNp2pa, convPa2np
 
 # ------------
 
@@ -17,6 +17,7 @@ import pyaudio
 import keyboard
 import scipy
 import numpy as np
+import time
 
 class MicAudioStream():
   def __init__(self):
@@ -25,17 +26,27 @@ class MicAudioStream():
     self.outInfo = AudioDevice(Conf.OutpuID)
     self.format = pyaudio.paFloat32
 
-  
+    self.fft = SpectrogramProcessing()
+    
+    self.data = np.zeros((Conf.SysChunk), dtype=np.float32)
+    self.npData = np.zeros((self.outInfo.micOutChannelNum, Conf.SysChunk) , dtype=np.float32)
+    self.freqData = np.zeros((self.outInfo.micOutChannelNum, self.fft.freq.shape[0]), dtype=np.float32)
+    self.outData = np.zeros((self.outInfo.micOutChannelNum * Conf.SysChunk), dtype=np.float32)
+    print(self.data.shape, self.npData.shape, self.outData.shape)
   def callback(self, in_data, frame_count, time_info, status):
     try:
-      pyAudio 2 numpy
-      data = convPa2np(scipy.fromstring(in_data, scipy.float32), channelNum=self.micInfo.micChannelNum)
-      data[0] = 0
-      data = convNp2pa(data)
-      print(data.shape)
+      #pyAudio 2 numpy
+      self.npData[:] = convPa2np(scipy.fromstring(in_data, scipy.float32), channelNum=self.micInfo.micChannelNum)[0, :] #ch1 input
+      self.freqData[:,:] = self.fft.fft(self.npData)
+      #self.npData[:,:] = self.data[:] #各チャネルに同じ値をins
+      
+      self.fft.ifft(self.freqData)
 
+      self.outData[:] = convNp2pa(self.npData)
+      
       #numpy 2 pyAudio
-      out_data = data.astype(np.float32).tostring()
+      out_data = self.outData.astype(np.float32).tostring()
+      
     except KeyboardInterrupt:
       pass
 
@@ -70,7 +81,7 @@ class MicAudioStream():
     """
     self.stream = self.pAudio.open(
       format = self.format,
-      rate = self.micInfo.samplingRate,
+      rate = Conf.SamplingRate,#self.micInfo.samplingRate,
       channels = self.micInfo.micChannelNum,
       input = True,
       output = True,
@@ -82,13 +93,13 @@ class MicAudioStream():
     self.stream.start_stream()
 
   def stop(self):
-    while st.stream.is_active():
-      pass
+    while self.stream.is_active():
+      time.sleep(0.1)
       #logger.debug("active")
   
-    st.stream.start_stream()
-    st.stream.close()
-    st.close()
+    self.stream.start_stream()
+    self.stream.close()
+    self.close()
 
   
   def close(self):

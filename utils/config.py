@@ -26,19 +26,18 @@ class configInit():
     config_ini.read(CONFIG_FILE_PATH, encoding='utf-8')
     logging.info('----設定開始----')
     try:
-      self.DEBUG = config_ini['Default']['DEBUG']
-      if self.DEBUG:
-        self.DEBUG = True
-      else:
-        self.DEBUG = False
-      
+      self.DEBUG = bool(config_ini['Default']['DEBUG'])
+
       self.MicID = int(config_ini['Microphone']['ID'])
       self.SamplingRate = int(config_ini['Microphone']['SamplingRate'])
 
       self.OutpuID = int(config_ini['Output']['ID'])
+      self.Record = bool(int(config_ini['Output']['Record']))
 
       self.WavefilePath = config_ini['Wavefile']['Path']
       self.WavefileSavePath = config_ini['Wavefile']['SavePath']
+
+      self.SysChunk = int(config_ini['System']['Chunk'])
 
 
     except Exception as e:
