@@ -35,8 +35,11 @@ class configInit():
       self.MicID = int(config_ini['Microphone']['ID'])
       self.SamplingRate = int(config_ini['Microphone']['SamplingRate'])
 
+      self.OutpuID = int(config_ini['Output']['ID'])
+
       self.WavefilePath = config_ini['Wavefile']['Path']
       self.WavefileSavePath = config_ini['Wavefile']['SavePath']
+
 
     except Exception as e:
       logger.info(e)
