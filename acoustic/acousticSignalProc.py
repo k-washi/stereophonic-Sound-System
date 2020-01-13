@@ -38,6 +38,7 @@ class AudioDevice():
     for i in range(self.pAudio.get_device_count()):
       micInfoDic = self.pAudio.get_device_info_by_index(i)
       if micInfoDic['index'] == micId:
+
         self.micName = micInfoDic['name']
         self.micChannelNum = micInfoDic['maxInputChannels']
         self.micOutChannelNum = micInfoDic['maxOutputChannels'] 
@@ -154,24 +155,46 @@ def convNp2pa(data):
 
 class SpectrogramProcessing():
   def __init__(self, freq = Conf.SamplingRate):
-    self.window = np.hamming(Conf.SysChunk)
+    self.window = np.hanning(Conf.SysChunk)
     self.freq = np.fft.rfftfreq(Conf.SysChunk, d=1./freq)
+    self.overlapWindow = np.hanning(Conf.SysChunk * 2)
+    self.overlapFreq = np.fft.rfftfreq(Conf.SysChunk * 2, d=1./freq)
+    self.overlapData = np.zeros((int(Conf.SysChunk * 2)), dtype = np.float32)
+    logger.info("Initialize fft processing: freq shape {0}".format(self.freq.shape))
    
   def fft(self, data):
     #in data: chanel_num x frame num(Conf.SysChunk)
     #out: chanel_num x freq num (if 1.6kHz, 0,...,7984.375 Hz) 
    
-   
     return np.fft.rfft(data * self.window)
+  
+  def overlapAdderFFT(self, data):
+    
+    self.overlapData[:Conf.SysChunk] = data 
+    return np.fft.rfft(self.overlapData)
+  
+  def fftNoWindow(self, data):
+    return np.fft.rfft(data)
 
   def ifft(self, data):
     #in: chanel_num x freq num (if 1.6kHz, 0,...,7984.375 Hz) 
     #out: chanel_num x frame num(Conf.SysChunk)
    
     return np.fft.irfft(data)
+  
+  def Aweight(self):
+    #https://en.wikipedia.org/wiki/A-weighting#cite_note-IEC61672-7
+    freq = self.overlapFreq
+    Ra = 12194**2 * freq**3 /((freq ** 2 + 20.6 ** 2) * np.sqrt(freq **2 + 158.5**2) * (freq ** 2 + 12194**2))
+    #Ra = 20 * np.log10(Ra + 0.00001) + 2.0
+    
+    return Ra
+
+  
 
 
 if __name__ == '__main__':
+  """
   mI= AudioDevice()
   mI.getAudioDeviceInfo()
   
@@ -179,4 +202,7 @@ if __name__ == '__main__':
   wP.getWaveInfo()
   wP.getData(wP.data)
   wP.Save()
+  """
+  spec = SpectrogramProcessing()
+  spec.Aweight()
   

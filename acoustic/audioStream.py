@@ -10,7 +10,7 @@ Conf = configInit()
 logger = Conf.setLogger(__name__)
 
 from acoustic.acousticSignalProc import AudioDevice, SpectrogramProcessing, WaveProcessing, convNp2pa, convPa2np
-
+from acoustic.spacialSound import spacialSound
 # ------------
 
 import pyaudio
@@ -24,6 +24,16 @@ class MicAudioStream():
     self.pAudio = pyaudio.PyAudio()
     self.micInfo = AudioDevice(Conf.MicID)
     self.outInfo = AudioDevice(Conf.OutpuID)
+    print(self.outInfo)
+    if self.outInfo.micOutChannelNum < 2:
+      self.left = 0
+      self.right = 0
+    else:
+      self.left = 0
+      self.right = 1
+      if self.outInfo.micOutChannelNum > 2:
+        self.outInfo.micChannelNum = 2
+        logger.info("出力マイク数が過剰であるため2チャンネルに制限しました。")
 
     self.startTime = time.time()
 
@@ -37,42 +47,62 @@ class MicAudioStream():
       exec(-1)
 
     self.fft = SpectrogramProcessing()
-    
-    self.data = np.zeros((int(Conf.SysChunk * 2)), dtype=self.dtype)
-    self.npData = np.zeros((self.outInfo.micOutChannelNum, int(Conf.SysChunk * 2)) , dtype=self.dtype)
-    self.freqData = np.zeros((int(Conf.SysChunk/Conf.SysFFToverlap), self.outInfo.micOutChannelNum, self.fft.freq.shape[0]), dtype=np.complex)
-    self.convFreqData = np.zeros((self.outInfo.micOutChannelNum, int(Conf.SysChunk*2)) , dtype=self.dtype)
-    self.outData = np.zeros((self.outInfo.micOutChannelNum * Conf.SysChunk), dtype=self.dtype)
 
-    self.overlapNum = int(Conf.SysChunk / Conf.SysFFToverlap) 
+    self.data = np.zeros((int(Conf.StreamChunk * 2)), dtype=self.dtype)
+    self.npData = np.zeros((self.outInfo.micOutChannelNum, int(Conf.StreamChunk * 2)) , dtype=self.dtype)
+
+    self.overlapNum = int(Conf.StreamChunk / Conf.SysFFToverlap) 
+
+    self.freqData = np.zeros((self.overlapNum, self.outInfo.micOutChannelNum, self.fft.freq.shape[0]), dtype=np.complex)
+    self.convFreqData = np.zeros((self.outInfo.micOutChannelNum, int(Conf.StreamChunk*2)) , dtype=self.dtype)
+    self.outData = np.zeros((self.outInfo.micOutChannelNum * Conf.StreamChunk), dtype=self.dtype)
+    
+
+    #Pos
+    self.x = 0.2
+    self.y = -10
+    self.z  = 0.1
+
+    self.hrft = spacialSound()
+    
 
     if Conf.Record:
       #test/listOrNumpy.py - concatenateは、numpyをlistに変換して挿入したほうが早い
       self.recordList = []
 
+  def spacialSoundConvering(self, freqData):
+    lhrtf, rhrtf = self.hrft.getHRTF(self.x, self.y, self.z)
+    #print(freqData[self.left].shape, lhrtf.shape)
+    freqData[self.left] = freqData[self.left] * lhrtf 
+    freqData[self.right] = freqData[self.right] * rhrtf 
+    return freqData
+
   def callback(self, in_data, frame_count, time_info, status):
     if time.time() - self.startTime > Conf.SysCutTime:
       #pyAudio 2 numpy
 
-      self.npData[:,Conf.SysChunk:] = convPa2np(np.fromstring(in_data, self.dtype), channelNum=self.micInfo.micChannelNum)[0, :] #ch1 input
+      self.npData[:,Conf.StreamChunk:] = convPa2np(np.fromstring(in_data, self.dtype), channelNum=self.micInfo.micChannelNum)[0, :] #ch1 input
       
       for i in range(self.overlapNum): #2, 4, 8
         self.freqData[i, :, :] = self.fft.fft(self.npData[:, Conf.SysFFToverlap * i : Conf.SysChunk + Conf.SysFFToverlap * i])
         
         
-      #doSomething
+        #doSomething
+        self.freqData[i, :, :] = self.spacialSoundConvering(self.freqData[i]) 
+        
 
-      for i in range(self.overlapNum):
         self.convFreqData[:, Conf.SysFFToverlap * i : Conf.SysChunk + Conf.SysFFToverlap * i] += self.fft.ifft(self.freqData[i]).astype(self.dtype)
 
-      self.outData[:] = convNp2pa(self.convFreqData[:,:Conf.SysChunk]) / self.overlapNum
+      self.outData[:] = convNp2pa(self.convFreqData[:,:Conf.StreamChunk]) #/ self.overlapNum
+      
+      
       if Conf.Record:
         self.recordList += self.outData.tolist()
       
 
-      self.npData[:, :Conf.SysChunk] = self.npData[:, Conf.SysChunk:]
-      self.convFreqData[:, :Conf.SysChunk] = self.convFreqData[:, Conf.SysChunk:]
-      self.convFreqData[:,Conf.SysChunk:] = 0
+      self.npData[:, :Conf.StreamChunk] = self.npData[:, Conf.StreamChunk:]
+      self.convFreqData[:, :Conf.StreamChunk] = self.convFreqData[:, Conf.StreamChunk:]
+      self.convFreqData[:,Conf.StreamChunk:] = 0
       
     #numpy 2 pyAudio
     out_data = self.outData.tostring()
@@ -113,7 +143,8 @@ class MicAudioStream():
       output = True,
       input_device_index = Conf.MicID,
       output_device_index = Conf.OutpuID,
-      stream_callback = self.callback
+      stream_callback = self.callback,
+      frames_per_buffer = Conf.StreamChunk
     )
 
     self.stream.start_stream()

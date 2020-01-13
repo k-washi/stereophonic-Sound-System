@@ -38,10 +38,17 @@ class configInit():
       self.WavefilePath = config_ini['Wavefile']['Path']
       self.WavefileSavePath = config_ini['Wavefile']['SavePath']
 
+      self.StreamChunk = int(config_ini['System']['StreamChunk'])
       self.SysChunk = int(config_ini['System']['Chunk'])
       self.SysFFToverlap = int(config_ini['System']['FFToverlap'])
       self.SysSampleWidth = int(config_ini['System']['SampleWidth'])
       self.SysCutTime = float(config_ini['System']['CutTime'])
+      self.SysAttenuation = int(config_ini['System']['Attenuation'])
+
+      self.HRTFmodel = config_ini['HRTF']['Model']
+      self.HRTFpath = config_ini['HRTF']['HRTF']
+      self.Elevpath = config_ini['HRTF']['Elev'] 
+      self.Azimuthpath = config_ini['HRTF']['Azimuth']
 
     except Exception as e:
       logger.info(e)
