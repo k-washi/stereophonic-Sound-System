@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package posXYZ;
+option go_package="posXYZpb";
+
+message Pos {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+//client streaming
+message Position{
+  Pos position = 1;
+  int32 status = 2;
+  string msg = 3;
+}
+
+message Msg{
+  int32 status = 1;
+  string msg = 2;
+}
+
+
+service PositinService{
+  
+  rpc PositionReq(Msg) returns (Position) {};
+  rpc PositionPub(Position) returns (Msg) {};
+}
+
+

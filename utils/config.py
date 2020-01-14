@@ -50,8 +50,12 @@ class configInit():
       self.Elevpath = config_ini['HRTF']['Elev'] 
       self.Azimuthpath = config_ini['HRTF']['Azimuth']
 
+      self.PosServer = config_ini['GRPC']['PosServer']
+      self.PosClient = config_ini['GRPC']['PosClient']
+      logger.debug(self.PosServer)
+
     except Exception as e:
-      logger.info(e)
+      logger.critical("config error {0}".format(e))
 
   
   def setLogger(self, name):
