@@ -155,7 +155,7 @@ def convNp2pa(data):
 
 class SpectrogramProcessing():
   def __init__(self, freq = Conf.SamplingRate):
-    self.window = np.hanning(Conf.SysChunk)
+    self.window = np.hamming(Conf.SysChunk)
     self.freq = np.fft.rfftfreq(Conf.SysChunk, d=1./freq)
     self.overlapWindow = np.hanning(Conf.SysChunk * 2)
     self.overlapFreq = np.fft.rfftfreq(Conf.SysChunk * 2, d=1./freq)
@@ -170,9 +170,13 @@ class SpectrogramProcessing():
   
   def overlapAdderFFT(self, data):
     
-    self.overlapData[:Conf.SysChunk] = data 
+    self.overlapData[:Conf.SysChunk] = data
     return np.fft.rfft(self.overlapData)
   
+  def spacializeFFT(self, data):
+    self.overlapData[:Conf.SysChunk] = data * self.window
+    return np.fft.rfft(self.overlapData)
+
   def fftNoWindow(self, data):
     return np.fft.rfft(data)
 

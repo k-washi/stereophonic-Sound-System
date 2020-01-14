@@ -86,14 +86,14 @@ class MicAudioStream():
       self.npData[Conf.StreamChunk:] = convPa2np(np.fromstring(in_data, self.dtype), channelNum=self.micInfo.micChannelNum)[0, :] #ch1 input
       #self.npData[Conf.StreamChunk:] = self.hrft.disanceAtenuation(self.npData[Conf.StreamChunk:], self.x, self.y, self.z) / 10
       for i in range(self.overlapNum): #2, 4, 8
-        self.freqData[i, :, :] = self.fft.overlapAdderFFT(self.npData[Conf.SysFFToverlap * i : Conf.SysChunk + Conf.SysFFToverlap * i])
+        self.freqData[i, :, :] = self.fft.spacializeFFT(self.npData[Conf.SysFFToverlap * i : Conf.SysChunk + Conf.SysFFToverlap * i])
         
          
         #doSomething
         self.freqData[i, :, :] = self.spacialSoundConvering(self.freqData[i]) 
         
         
-        self.convFreqData[:, Conf.SysFFToverlap * i : Conf.SysChunk*2 + Conf.SysFFToverlap * i] += self.fft.ifft(self.freqData[i]).real.astype(self.dtype)
+        self.convFreqData[:, Conf.SysFFToverlap * i  : Conf.SysChunk * 2 + Conf.SysFFToverlap * i] += self.fft.ifft(self.freqData[i]).real.astype(self.dtype)#[:,:Conf.SysChunk]
 
       self.outData[:] = convNp2pa(self.convFreqData[:,:Conf.StreamChunk]) #/ self.overlapNum
       self.outData[:] = self.hrft.disanceAtenuation(self.outData[:], self.x, self.y, self.z) / Conf.SysAttenuation
@@ -152,24 +152,22 @@ class MicAudioStream():
     self.stream.start_stream()
 
   def stop(self):
-    shift = 0.2
+    from proto.client import posClient
+    
+    grpcPosGetter = posClient()
+    grpcPosGetter.open()
 
     while self.stream.is_active():
       time.sleep(0.1)
-      if Conf.Record:
-        if self.y > 10:
-          shift = -0.2
-          
-        elif self.y < -10:
-          shift = 0.2
-        self.y += shift
-        self.x += shift
-        
-        if  time.time() - self.startTime > Conf.RecordTime + Conf.SysCutTime:
-          break
-      #logger.debug("active")
-  
+      try:
+        ok = grpcPosGetter.posRequest()
+        if ok:
+          self.x, self.y, self.z = grpcPosGetter.getPos()
+      except Exception as e:
+        logger.error("pos getter error {0}".format(e))
 
+      if time.time() - self.startTime > Conf.RecordTime + Conf.SysCutTime:
+        break
 
     if Conf.Record:
       record = WaveProcessing()
@@ -179,6 +177,7 @@ class MicAudioStream():
     self.stream.start_stream()
     self.stream.close()
     self.close()
+    grpcPosGetter.close()
     
 
   

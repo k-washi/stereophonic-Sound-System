@@ -72,7 +72,7 @@ if __name__ == "__main__":
   
   z = 0.
   azimuth = 0.
-  aziShift = 5 * np.pi / 180.
+  aziShift = 45 * np.pi / 180.
 
   def azi2pos(azimuth):
     x = np.cos(azimuth)
@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
   try:
     while True:
-      time.sleep(0.2)
+      time.sleep(0.5)
       azimuth += aziShift
       x,y = azi2pos(azimuth)
       server.posServer.pubPos(x,y,z)
