@@ -1,0 +1,7 @@
+numpy==1.18.1
+opencv-python==4.1.2.30
+protobuf==3.11.2
+PyAudio==0.2.11
+scipy==1.4.1
+six==1.13.0
+grpcio-tools==1.26.0

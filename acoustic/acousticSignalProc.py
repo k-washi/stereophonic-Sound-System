@@ -198,15 +198,15 @@ class SpectrogramProcessing():
 
 
 if __name__ == '__main__':
-  """
   mI= AudioDevice()
   mI.getAudioDeviceInfo()
   
+  """
   wP = WaveProcessing()
   wP.getWaveInfo()
   wP.getData(wP.data)
   wP.Save()
-  """
+  
   spec = SpectrogramProcessing()
   spec.Aweight()
-  
+  """
