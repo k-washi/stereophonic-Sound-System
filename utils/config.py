@@ -3,13 +3,14 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-import logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+#import logging
+#logger = logging.getLogger(__name__)
+#logger.setLevel(logging.INFO)
 
 # ------------
 
-import utils.logConf
+from utils.logConf import logging
+logger = logging.getLogger(__name__)
 
 # -------------
 
@@ -52,7 +53,6 @@ class configInit():
 
       self.PosServer = config_ini['GRPC']['PosServer']
       self.PosClient = config_ini['GRPC']['PosClient']
-      logger.debug(self.PosServer)
 
     except Exception as e:
       logger.critical("config error {0}".format(e))
